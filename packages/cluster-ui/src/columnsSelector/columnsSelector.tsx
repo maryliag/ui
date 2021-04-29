@@ -9,6 +9,10 @@ import {
   hidden,
 } from "../queryFilter/filterClasses";
 import { List } from "@cockroachlabs/icons";
+import {
+  DeselectOptionActionMeta,
+  SelectOptionActionMeta,
+} from "react-select/src/types";
 
 const cx = classNames.bind(styles);
 
@@ -19,14 +23,15 @@ export interface SelectOption {
 }
 
 export interface ColumnsSelectorProps {
+  // options provides the list of available columns and their initial selection state
   options: SelectOption[];
-  selected: string[];
-  onSubmitColumns: (selected: string[]) => void;
+  onSubmitColumns: (selectedColumns: string[]) => void;
 }
 
 export interface ColumnsSelectorState {
   hide: boolean;
-  value: string[];
+  // selectionState contains current state of selections
+  selectionState: Map<string, boolean>;
 }
 
 /**
@@ -96,9 +101,15 @@ export default class ColumnsSelector extends React.Component<
 > {
   constructor(props: ColumnsSelectorProps) {
     super(props);
+    const allSelected = props.options.every(o => o.isSelected);
+    // set initial state of selections based on props
+    const selectionState = new Map(
+      props.options.map(o => [o.value, allSelected || o.isSelected]),
+    );
+    selectionState.set("all", allSelected);
     this.state = {
       hide: true,
-      value: this.props.selected,
+      selectionState,
     };
   }
   dropdownRef: React.RefObject<HTMLDivElement> = React.createRef();
@@ -128,88 +139,91 @@ export default class ColumnsSelector extends React.Component<
   // add all items (including "all") to the list,
   // if any other value was deselected, remove "all" from the list.
   handleChange = (
-    selectedOptions: OptionsType<SelectOption>,
-    allOptions: OptionsType<SelectOption>,
+    _selectedOptions: OptionsType<SelectOption>,
+    // get actual selection of specific option and action type from "actionMeta"
+    actionMeta:
+      | SelectOptionActionMeta<SelectOption>
+      | DeselectOptionActionMeta<SelectOption>,
   ) => {
-    let selected = selectedOptions.map(function(option: SelectOption) {
-      return option.value;
-    });
+    const { option, action } = actionMeta;
+    const selectionState = new Map(this.state.selectionState);
+    // true - if option was selected, false - otherwise
+    const isSelectedOption = action === "select-option";
 
-    if (this.wasAllDeselected(selected)) {
-      selected = [];
-    } else if (this.wasAllSelect(selected)) {
-      selected = allOptions.map(function(option: SelectOption) {
-        return option.value;
-      });
+    // if "all" option was toggled - update all other options
+    if (option.value === "all") {
+      selectionState.forEach((_v, k) =>
+        selectionState.set(k, isSelectedOption),
+      );
     } else {
-      const index = selected.indexOf("all", 0);
-      if (index > -1) {
-        selected.splice(index, 1);
+      // check if all other options (except current changed and "all" options) are selected as well to select "all" option
+      const allOtherOptionsSelected = [...selectionState.entries()]
+        .filter(([k, _v]) => ![option.value, "all"].includes(k)) // filter all options except currently changed and "all" option
+        .every(([_k, v]) => v);
+
+      // update "all" option if other options are selected
+      if (allOtherOptionsSelected) {
+        selectionState.set("all", isSelectedOption);
       }
+
+      selectionState.set(option.value, isSelectedOption);
     }
     this.setState({
-      value: selected,
+      selectionState,
     });
   };
-  // Check if the value "all" was the selected option or
-  // if the value "all" should be selected because all
-  // other values were selected.
-  wasAllSelect = (newSelection: string[]): boolean => {
+
+  isToggledOption = (nextOption: SelectOption): boolean => {
     return (
-      (this.state.value !== undefined &&
-        !this.state.value.includes("default") &&
-        newSelection.includes("all") &&
-        !this.state.value.includes("all")) ||
-      this.isAllSelected(newSelection)
+      this.state.selectionState.get(nextOption.value) === nextOption.isSelected
     );
   };
-  wasAllDeselected = (newSelection: string[]): boolean => {
-    return (
-      !newSelection.includes("all") &&
-      (this.state.value === undefined ||
-        this.state.value.includes("all") ||
-        this.state.value.includes("default"))
-    );
-  };
+
   handleSubmit = () => {
-    this.props.onSubmitColumns(this.state.value);
+    const { selectionState } = this.state;
+    const selectedValues = this.props.options
+      .filter(o => selectionState.get(o.value))
+      .filter(o => o.value === "all") // do not include artificial option "all". It should live only inside this component.
+      .map(o => o.value);
+    this.props.onSubmitColumns(selectedValues);
     this.setState({ hide: true });
   };
 
-  isAllSelected = (selected: string[]) => {
-    if (selected == undefined) return false;
-    // If the current selection includes "all" and the size of current list (excluding "all")
-    // is the same as the total size of all options, then "all" should be selected.
-    if (selected.includes("all"))
-      return selected.length - 1 == this.props.options.length;
+  isAllSelected = (): boolean => {
+    return this.state.selectionState.get("all");
+  };
 
-    // If the current list doesn't contain "all" but it's "default" or has the same size
-    // as the total size of all options, "all" should be selected.
-    return (
-      selected.includes("default") ||
-      selected.length == this.props.options.length
-    );
+  // getOptions returns list of all options with updated selection states
+  // and prepends "all" option as an artificial option
+  getOptions = (): SelectOption[] => {
+    const { options } = this.props;
+    const { selectionState } = this.state;
+    const isAllSelected = this.isAllSelected();
+    const allOption: SelectOption = {
+      label: "All",
+      value: "all",
+      isSelected: isAllSelected,
+    };
+    return [allOption, ...options].map(o => {
+      let isSelected = o.isSelected; // default value;
+      if (isAllSelected) {
+        isSelected = true;
+      } else if (selectionState.has(o.value)) {
+        isSelected = selectionState.get(o.value);
+      }
+      return {
+        ...o,
+        // if "all" is selected then every item in the list selected as well
+        isSelected,
+      };
+    });
   };
 
   render() {
-    const { hide, value } = this.state;
-    const { options } = this.props;
+    const { hide } = this.state;
     const dropdownArea = hide ? hidden : dropdown;
-    const optionsWithAll = [
-      {
-        label: "All",
-        value: "all",
-        isSelected: this.isAllSelected(this.state.value),
-      },
-    ].concat(options);
-    const columnsSelected = optionsWithAll.filter(option => {
-      if (option.value == "all") return this.isAllSelected(this.state.value);
-      return (
-        value == undefined ||
-        value.includes("default") ||
-        value.includes(option.value)
-      );
-    });
+    const options = this.getOptions();
+    const columnsSelected = options.filter(o => o.isSelected);
 
     return (
       <div
@@ -226,9 +240,9 @@ export default class ColumnsSelector extends React.Component<
             <Select
               isMulti
               menuIsOpen={true}
-              options={optionsWithAll}
+              options={options}
               value={columnsSelected}
-              onChange={selected => this.handleChange(selected, optionsWithAll)}
+              onChange={this.handleChange}
               hideSelectedOptions={false}
               closeMenuOnSelect={false}
               components={{ Option: CheckboxOption }}

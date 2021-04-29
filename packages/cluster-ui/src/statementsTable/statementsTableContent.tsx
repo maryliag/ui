@@ -35,7 +35,30 @@ export type NodeNames = { [nodeId: string]: string };
 const cx = classNames.bind(styles);
 type IStatementDiagnosticsReport = cockroach.server.serverpb.IStatementDiagnosticsReport;
 
-export const StatementTableTitle = {
+// Single place for column names. Used in table columns and inb columns selector.
+export const statementColumnLabels = {
+  statements: "Statements",
+  database: "Database",
+  executionCount: "Execution Count",
+  rowsRead: "Rows Read",
+  bytesRead: "Bytes Read",
+  statementTime: "Statement Time",
+  transactionTime: "Transaction Time",
+  contention: "Contention",
+  maxMemUsage: "Max Memory",
+  networkBytes: "Network",
+  retries: "Retries",
+  workloadPct: "% of All Runtime",
+  diagnostics: "Diagnostics",
+};
+
+export type StatementTableColumnKeys = keyof typeof statementColumnLabels;
+
+type StatementTableTitleType = {
+  [key in StatementTableColumnKeys]: JSX.Element;
+};
+
+export const StatementTableTitle: StatementTableTitleType = {
   statements: (
     <Tooltip
       placement="bottom"
@@ -55,7 +78,7 @@ export const StatementTableTitle = {
         </>
       }
     >
-      Statements
+      {statementColumnLabels.statements}
     </Tooltip>
   ),
   database: (

@@ -104,11 +104,12 @@ export const ConnectedStatementsPage = withRouter(
             page: "Statements",
           }),
         ),
-      onColumnsChange: (selected: string) =>
+      onColumnsChange: (selectedColumns: string[]) =>
         dispatch(
           localStorageActions.update({
             key: "showColumns/StatementsPage",
-            value: selected,
+            // isolate transformation from array to string in single place
+            value: selectedColumns.join(","),
           }),
         ),
     }),

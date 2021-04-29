@@ -188,5 +188,9 @@ export const selectStatementsLastError = createSelector(
 
 export const selectColumns = createSelector(
   localStorageSelector,
-  localStorage => localStorage["showColumns/StatementsPage"] || "default",
+  // return array of columns if user customized list of `null` if default set of columns should be used
+  localStorage =>
+    localStorage["showColumns/StatementsPage"]
+      ? localStorage["showColumns/StatementsPage"].split(",")
+      : null,
 );

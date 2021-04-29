@@ -33,7 +33,6 @@ const longToInt = (d: number | Long) => Number(FixLong(d));
 function makeCommonColumns(
   statements: AggregateStatistics[],
   totalWorkload: number,
-  displayColumns?: string[],
 ): ColumnDescriptor<AggregateStatistics>[] {
   const defaultBarChartOptions = {
     classes: {
@@ -69,7 +68,7 @@ function makeCommonColumns(
   // If adding new columns, also add it to src/statementsPage/statementsPage.tsx
   // and if the column should be hidden by default add it to ignoreColumnsOnDefault
   // on that same file.
-  const columns = [
+  const columns: ColumnDescriptor<AggregateStatistics>[] = [
     {
       name: "executionCount",
       title: StatementTableTitle.executionCount,
@@ -83,6 +82,7 @@ function makeCommonColumns(
       className: cx("statements-table__col-database"),
       cell: (stmt: AggregateStatistics) => stmt.database,
       sort: (stmt: AggregateStatistics) => FixLong(Number(stmt.database)),
+      showByDefault: false,
     },
     {
       name: "rowsRead",
@@ -148,13 +148,7 @@ function makeCommonColumns(
         totalWorkload,
     },
   ];
-  if (displayColumns == undefined || displayColumns.includes("default")) {
-    return columns;
-  }
-
-  return columns.filter(option => {
-    return displayColumns.includes(option.name);
-  });
+  return columns;
 }
 
 export interface AggregateStatistics {
@@ -197,7 +191,6 @@ export function makeStatementsColumns(
   selectedApp: string,
   // totalWorkload is the sum of service latency of all statements listed on the table.
   totalWorkload: number,
-  displayColumns?: string[],
   search?: string,
   activateDiagnosticsRef?: React.RefObject<ActivateDiagnosticsModalRef>,
   onDiagnosticsDownload?: (report: IStatementDiagnosticsReport) => void,
@@ -216,7 +209,7 @@ export function makeStatementsColumns(
       sort: stmt => stmt.label,
     },
   ];
-  columns.push(...makeCommonColumns(statements, totalWorkload, displayColumns));
+  columns.push(...makeCommonColumns(statements, totalWorkload));
 
   if (activateDiagnosticsRef) {
     const diagnosticsColumn: ColumnDescriptor<AggregateStatistics> = {
@@ -245,7 +238,6 @@ export function makeNodesColumns(
   statements: AggregateStatistics[],
   nodeNames: NodeNames,
   totalWorkload: number,
-  displayColumns?: string[],
 ): ColumnDescriptor<AggregateStatistics>[] {
   const original: ColumnDescriptor<AggregateStatistics>[] = [
     {
@@ -255,7 +247,5 @@ export function makeNodesColumns(
     },
   ];
 
-  return original.concat(
-    makeCommonColumns(statements, totalWorkload, displayColumns),
-  );
+  return original.concat(makeCommonColumns(statements, totalWorkload));
 }

@@ -41,6 +41,8 @@ export interface ColumnDescriptor<T> {
   titleAlign?: "left" | "right" | "center";
   // uniq column identifier
   name: string;
+  // show or hide column by default; It can be overridden by users settings. True if not defined.
+  showByDefault?: boolean;
 }
 
 /**

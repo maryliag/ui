@@ -770,7 +770,6 @@ export class StatementDetails extends React.Component<
                 statsByNode,
                 this.props.nodeNames,
                 totalWorkload,
-                ["default"],
               )}
               sortSetting={this.state.sortSetting}
               onChangeSortSetting={this.changeSortSetting}

@@ -5,7 +5,7 @@ import Helmet from "react-helmet";
 import classNames from "classnames/bind";
 import { Loading } from "src/loading";
 import { PageConfig, PageConfigItem } from "src/pageConfig";
-import { SortSetting } from "src/sortedtable";
+import { ColumnDescriptor, SortSetting } from "src/sortedtable";
 import { Search } from "src/search";
 import { Pagination } from "src/pagination";
 import { TableStatistics } from "../tableStatistics";
@@ -22,7 +22,9 @@ import { appAttr, getMatchParamByName, calculateTotalWorkload } from "src/util";
 import {
   AggregateStatistics,
   makeStatementsColumns,
+  statementColumnLabels,
   StatementsSortedTable,
+  StatementTableColumnKeys,
 } from "../statementsTable";
 import {
   ActivateStatementDiagnosticsModal,
@@ -63,7 +65,7 @@ export interface StatementsPageDispatchProps {
   onDiagnosticsReportDownload?: (report: IStatementDiagnosticsReport) => void;
   onFilterChange?: (value: string) => void;
   onStatementClick?: (statement: string) => void;
-  onColumnsChange?: (value: string) => void;
+  onColumnsChange?: (selectedColumns: string[]) => void;
 }
 
 export interface StatementsPageStateProps {
@@ -73,7 +75,7 @@ export interface StatementsPageStateProps {
   databases: string[];
   totalFingerprints: number;
   lastReset: string;
-  columns: string;
+  columns: string[];
 }
 
 export interface StatementsPageState {
@@ -82,8 +84,6 @@ export interface StatementsPageState {
   pagination: ISortedTablePagination;
   filters?: Filters;
   activeFilters?: number;
-  tableColumnsSelected?: string[];
-  ignoreColumnsOnDefault?: string[];
 }
 
 export type StatementsPageProps = StatementsPageDispatchProps &
@@ -113,8 +113,6 @@ export class StatementsPage extends React.Component<
       search: "",
       filters: filters,
       activeFilters: calculateActiveFilters(filters),
-      tableColumnsSelected: this.props.columns.split(","),
-      ignoreColumnsOnDefault: ["database"],
     };
 
     const stateFromHistory = this.getStateFromHistory();
@@ -311,35 +309,11 @@ export class StatementsPage extends React.Component<
   };
 
   onColumnsUpdated = (selected: string[]) => {
-    this.setState({
-      tableColumnsSelected: selected,
-    });
-    const columns = selected.length === 0 ? "empty" : selected.toString();
-    this.props.onColumnsChange(columns);
-  };
-
-  // the first time the tableColumnsSelected value is initialized
-  // it will be "default", but on this page it should deselect the columns
-  // on ignoreColumnsOnDefault.
-  isColumnSelected = (option: string) => {
-    if (
-      this.state.tableColumnsSelected == undefined ||
-      (this.state.tableColumnsSelected.includes("default") &&
-        !this.state.ignoreColumnsOnDefault.includes(option))
-    )
-      return true;
-    return this.state.tableColumnsSelected.includes(option);
+    this.props.onColumnsChange(selected);
   };
 
   renderStatements = () => {
-    const {
-      pagination,
-      search,
-      filters,
-      activeFilters,
-      tableColumnsSelected,
-      ignoreColumnsOnDefault,
-    } = this.state;
+    const { pagination, search, filters, activeFilters } = this.state;
     const {
       statements,
       databases,
@@ -348,6 +322,8 @@ export class StatementsPage extends React.Component<
       onDiagnosticsReportDownload,
       onStatementClick,
       resetSQLStats,
+      columns: userSelectedColumnsToShow,
+      onColumnsChange,
     } = this.props;
     const appAttrValue = getMatchParamByName(match, appAttr);
     const selectedApp = appAttrValue || "";
@@ -357,67 +333,34 @@ export class StatementsPage extends React.Component<
     const totalWorkload = calculateTotalWorkload(data);
     const totalCount = data.length;
     const isEmptySearchResults = statements?.length > 0 && search?.length > 0;
-    const tableColumns = [
-      {
-        label: "Execution Count",
-        value: "executionCount",
-        isSelected: this.isColumnSelected("executionCount"),
-      },
-      {
-        label: "Database",
-        value: "database",
-        isSelected: this.isColumnSelected("database"),
-      },
-      {
-        label: "Rows Read",
-        value: "rowsRead",
-        isSelected: this.isColumnSelected("rowsRead"),
-      },
-      {
-        label: "Bytes Read",
-        value: "bytesRead",
-        isSelected: this.isColumnSelected("bytesRead"),
-      },
-      {
-        label: "Statement Time",
-        value: "latency",
-        isSelected: this.isColumnSelected("latency"),
-      },
-      {
-        label: "Contention",
-        value: "contention",
-        isSelected: this.isColumnSelected("contention"),
-      },
-      {
-        label: "Max Memory",
-        value: "maxMemoryUsage",
-        isSelected: this.isColumnSelected("maxMemoryUsage"),
-      },
-      {
-        label: "Network",
-        value: "networkBytes",
-        isSelected: this.isColumnSelected("networkBytes"),
-      },
-      {
-        label: "Retries",
-        value: "retries",
-        isSelected: this.isColumnSelected("retries"),
-      },
-      {
-        label: "% of All Runtime",
-        value: "workloadPct",
-        isSelected: this.isColumnSelected("workloadPct"),
-      },
-    ];
 
-    // Hide columns on ignoreColumnsOnDefault if the current value is "default"
-    const columnsSelected = tableColumnsSelected.includes("default")
-      ? tableColumns
-          .filter(column => !ignoreColumnsOnDefault.includes(column.value))
-          .map(function(option: SelectOption) {
-            return option.value;
-          })
-      : tableColumnsSelected;
+    const columns = makeStatementsColumns(
+      statements,
+      selectedApp,
+      totalWorkload,
+      search,
+      this.activateDiagnosticsRef,
+      onDiagnosticsReportDownload,
+      onStatementClick,
+    );
+
+    const isColumnSelected = (c: ColumnDescriptor<AggregateStatistics>) => {
+      return (
+        userSelectedColumnsToShow.includes(c.name) || // show column if user previously changed its visibility
+        c.showByDefault === undefined || // show column if showByDefault is not set. Default behavior to show column.
+        c.showByDefault === true // show column if showByDefault option is set explicitly.
+      );
+    };
+
+    // iterate over all available columns and create list of SelectOptions with initial selection
+    // values based on stored user selections in local storage and default column configs.
+    const tableColumns = columns.map(
+      (c): SelectOption => ({
+        label: statementColumnLabels[c.name as StatementTableColumnKeys],
+        value: c.name,
+        isSelected: isColumnSelected(c),
+      }),
+    );
 
     return (
       <div>
@@ -446,8 +389,7 @@ export class StatementsPage extends React.Component<
           <div>
             <ColumnsSelector
               options={tableColumns}
-              selected={columnsSelected}
-              onSubmitColumns={this.onColumnsUpdated}
+              onSubmitColumns={onColumnsChange}
             />
             <TableStatistics
               pagination={pagination}
@@ -463,16 +405,7 @@ export class StatementsPage extends React.Component<
           <StatementsSortedTable
             className="statements-table"
             data={data}
-            columns={makeStatementsColumns(
-              statements,
-              selectedApp,
-              totalWorkload,
-              columnsSelected,
-              search,
-              this.activateDiagnosticsRef,
-              onDiagnosticsReportDownload,
-              onStatementClick,
-            )}
+            columns={columns}
             sortSetting={this.state.sortSetting}
             onChangeSortSetting={this.changeSortSetting}
             renderNoResult={
