@@ -25,7 +25,7 @@ export const TableHead: React.FC<TableHeadProps> = ({
   const cellContentWrapper = cx("inner-content-wrapper");
   const arrowsClass = cx("sortable__actions");
 
-  function handleSort(thSortKey: any, picked: boolean, columnTitle?: string) {
+  function handleSort(picked: boolean, columnTitle?: string) {
     // If the sort key is different than the previous key, initial sort
     // descending. If the same sort key is clicked multiple times consecutively,
     // first change to ascending, then remove the sort key.
@@ -33,12 +33,12 @@ export const TableHead: React.FC<TableHeadProps> = ({
     const DESCENDING = false;
 
     const direction = picked ? ASCENDING : DESCENDING;
-    const sortElementKey = picked && sortSetting.ascending ? null : thSortKey;
+    const sortElementColumnTitle =
+      picked && sortSetting.ascending ? null : columnTitle;
 
     onChangeSortSetting({
-      sortKey: sortElementKey,
       ascending: direction,
-      columnTitle,
+      columnTitle: sortElementColumnTitle,
     });
   }
 
@@ -47,12 +47,10 @@ export const TableHead: React.FC<TableHeadProps> = ({
       <tr className={trClass}>
         {expandableConfig && <th className={thClass} />}
         {columns.map((c: SortableColumn, idx: number) => {
-          const sortable = c.sortKey !== (null || undefined);
-          const picked = c.sortKey === sortSetting.sortKey;
+          const sortable = c.columnTitle !== (null || undefined);
+          const picked = c.name === sortSetting.columnTitle;
           const style = { textAlign: c.titleAlign };
-          const cellAction = sortable
-            ? () => handleSort(c.sortKey, picked, c.name)
-            : null;
+          const cellAction = sortable ? () => handleSort(picked, c.name) : null;
           const cellClasses = cx(
             "head-wrapper__cell",
             "sorted__cell",

@@ -18,7 +18,7 @@ storiesOf("StatementsSortedTable", module)
       columns={makeStatementsColumns(statements, "(internal)")}
       sortSetting={{
         ascending: false,
-        sortKey: 3,
+        columnTitle: "rowsRead",
       }}
       pagination={{
         pageSize: 20,
