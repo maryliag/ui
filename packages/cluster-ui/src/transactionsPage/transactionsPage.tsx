@@ -14,14 +14,13 @@ import {
 } from "./transactionsPageClasses";
 import {
   aggregateAcrossNodeIDs,
+  collectStatementsTextWithReps,
   generateRegionNode,
+  getStatementsById,
+  getStatementsByIdInOrder,
   getTrxAppFilterOptions,
 } from "./utils";
-import {
-  searchTransactionsData,
-  filterTransactions,
-  getStatementsById,
-} from "./utils";
+import { searchTransactionsData, filterTransactions } from "./utils";
 import { forIn } from "lodash";
 import Long from "long";
 import { aggregateStatementStats, getSearchParams, unique } from "src/util";
@@ -308,11 +307,16 @@ export class TransactionsPage extends React.Component<
   renderTransactionDetails() {
     const { statements } = this.props.data;
     const { statementIds } = this.state;
+    const orderedStatements = getStatementsByIdInOrder(
+      statementIds,
+      statements,
+    );
     const transactionDetails =
       statementIds && getStatementsById(statementIds, statements);
 
     return (
       <TransactionDetails
+        statementsSummary={collectStatementsTextWithReps(orderedStatements)}
         statements={aggregateStatementStats(transactionDetails)}
         nodeRegions={this.props.nodeRegions}
         transactionStats={this.state.transactionStats}

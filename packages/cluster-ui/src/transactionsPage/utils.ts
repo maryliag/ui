@@ -10,11 +10,11 @@ import Long from "long";
 import _ from "lodash";
 import {
   addExecStats,
+  addStatementStats,
   aggregateNumericStats,
-  containAny,
+  CollectedStatementStatistics,
   FixLong,
   longToInt,
-  unique,
 } from "../util";
 
 type Statement = protos.cockroach.server.serverpb.StatementsResponse.ICollectedStatementStatistics;
@@ -43,11 +43,50 @@ export const getTrxAppFilterOptions = (
 export const collectStatementsText = (statements: Statement[]): string =>
   statements.map(s => s.key.key_data.query).join("\n");
 
+export interface StatementsCount {
+  query: string;
+  count: number;
+}
+
+export const collectStatementsTextWithReps = (
+  statements: Statement[],
+): string => {
+  const statementsInfo: StatementsCount[] = [];
+  let index = 0;
+
+  statements.forEach(s => {
+    if (index > 0 && statementsInfo[index - 1].query === s.key.key_data.query) {
+      statementsInfo[index - 1].count++;
+    } else {
+      statementsInfo.push({ query: s.key.key_data.query, count: 1 });
+      index++;
+    }
+  });
+
+  return statementsInfo
+    .map(s => {
+      if (s.count > 1) return s.query + " (x" + s.count + ")";
+      return s.query;
+    })
+    .join("\n");
+};
+
 export const getStatementsById = (
   statementsIds: Long[],
   statements: Statement[],
 ): Statement[] => {
   return statements.filter(s => statementsIds.some(id => id.eq(s.id)));
+};
+
+export const getStatementsByIdInOrder = (
+  statementsIds: Long[],
+  statements: Statement[],
+): Statement[] => {
+  const allStatements: Statement[] = [];
+  statementsIds.forEach(id => {
+    allStatements.push(statements.filter(s => id.eq(s.id))[0]);
+  });
+  return allStatements;
 };
 
 export const aggregateStatements = (
@@ -198,8 +237,8 @@ const withFingerprint = function(
 ): TransactionWithFingerprint {
   return {
     ...t,
-    fingerprint: collectStatementsText(
-      getStatementsById(t.stats_data.statement_ids, stmts),
+    fingerprint: collectStatementsTextWithReps(
+      getStatementsByIdInOrder(t.stats_data.statement_ids, stmts),
     ),
   };
 };

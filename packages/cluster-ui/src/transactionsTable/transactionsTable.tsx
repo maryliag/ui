@@ -23,6 +23,8 @@ import { SortSetting } from "../sortedtable";
 import {
   getStatementsById,
   collectStatementsText,
+  collectStatementsTextWithReps,
+  getStatementsByIdInOrder,
 } from "../transactionsPage/utils";
 import Long from "long";
 import classNames from "classnames/bind";
@@ -30,7 +32,6 @@ import statementsPageStyles from "src/statementsTable/statementsTableContent.mod
 
 type Transaction = protos.cockroach.server.serverpb.StatementsResponse.IExtendedCollectedTransactionStatistics;
 type TransactionStats = protos.cockroach.sql.ITransactionStatistics;
-type CollectedTransactionStatistics = protos.cockroach.sql.ICollectedTransactionStatistics;
 type Statement = protos.cockroach.server.serverpb.StatementsResponse.ICollectedStatementStatistics;
 
 interface TransactionsTable {
@@ -103,8 +104,8 @@ export const TransactionsTable: React.FC<TransactionsTable> = props => {
       title: <>Transactions</>,
       cell: (item: TransactionInfo) =>
         textCell({
-          transactionText: collectStatementsText(
-            getStatementsById(item.stats_data.statement_ids, statements),
+          transactionText: collectStatementsTextWithReps(
+            getStatementsByIdInOrder(item.stats_data.statement_ids, statements),
           ),
           transactionIds: item.stats_data.statement_ids,
           transactionStats: item.stats_data.stats,
@@ -112,8 +113,8 @@ export const TransactionsTable: React.FC<TransactionsTable> = props => {
           search,
         }),
       sort: (item: TransactionInfo) =>
-        collectStatementsText(
-          getStatementsById(item.stats_data.statement_ids, statements),
+        collectStatementsTextWithReps(
+          getStatementsByIdInOrder(item.stats_data.statement_ids, statements),
         ),
     },
     {

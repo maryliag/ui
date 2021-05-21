@@ -13,10 +13,6 @@ import { Pagination } from "../pagination";
 import { TableStatistics } from "../tableStatistics";
 import { baseHeadingClasses } from "../transactionsPage/transactionsPageClasses";
 import { Button } from "../button";
-import {
-  collectStatementsText,
-  generateRegionNode,
-} from "src/transactionsPage/utils";
 import { tableClasses } from "../transactionsTable/transactionsTableClasses";
 import { SqlBox } from "../sql";
 import { aggregateStatements } from "../transactionsPage/utils";
@@ -52,6 +48,7 @@ const transactionDetailsStylesCx = classNames.bind(transactionDetailsStyles);
 
 interface TransactionDetailsProps {
   statements?: Statement[];
+  statementsSummary?: string;
   nodeRegions: { [nodeId: string]: string };
   transactionStats?: TransactionStats;
   lastReset?: string | Date;
@@ -98,6 +95,7 @@ export class TransactionDetails extends React.Component<
   render() {
     const {
       statements,
+      statementsSummary,
       transactionStats,
       handleDetails,
       error,
@@ -122,9 +120,8 @@ export class TransactionDetails extends React.Component<
           error={error}
           loading={!statements || !transactionStats}
           render={() => {
-            const { statements, transactionStats, lastReset } = this.props;
+            const { transactionStats, lastReset } = this.props;
             const { sortSetting, pagination } = this.state;
-            const statementsSummary = collectStatementsText(statements);
             const aggregatedStatements = aggregateStatements(statements);
             const totalWorkload = calculateTotalWorkload(statements);
             populateRegionNodeForStatements(aggregatedStatements, nodeRegions);
@@ -229,7 +226,9 @@ export class TransactionDetails extends React.Component<
                     pagination={pagination}
                     totalCount={statements.length}
                     lastReset={lastReset}
-                    arrayItemName={"statements for this transaction"}
+                    arrayItemName={
+                      "statements for all executions of this transaction"
+                    }
                     activeFilters={0}
                     resetSQLStats={resetSQLStats}
                   />
